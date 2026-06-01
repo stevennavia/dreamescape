@@ -30,7 +30,7 @@ export const CONFIG = {
   noiseScale: 0.012,
   noiseAmplitude: 8,
   islandCount: 10,
-  orbsOnIslands: 2,
+  orbsOnIslands: 1,
   totalOrbs: 3,
   crystalCount: 8,
   archCount: 5,

@@ -90,23 +90,42 @@ export function createSky() {
   moonLight.position.copy(moon.position);
   group.add(moonLight);
 
-  // --- Subtle horizon clouds (transparent rings near ground) ---
-  for (let i = 0; i < 6; i++) {
-    const cRad = 60 + Math.random() * 100;
-    const cY = -5 + Math.random() * 15;
+  // --- Horizon clouds (visible rings near ground) ---
+  for (let i = 0; i < 12; i++) {
+    const cRad = 50 + Math.random() * 130;
+    const cY = -8 + Math.random() * 25;
     const cloudMat = new THREE.MeshBasicMaterial({
       color: midColor,
       transparent: true,
-      opacity: 0.015 + Math.random() * 0.02,
+      opacity: 0.03 + Math.random() * 0.06,
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
-    const cloud = new THREE.Mesh(new THREE.RingGeometry(cRad * 0.5, cRad, 24), cloudMat);
+    const cloud = new THREE.Mesh(new THREE.RingGeometry(cRad * 0.4, cRad, 24), cloudMat);
     cloud.position.set(0, cY, 0);
     cloud.rotation.x = -Math.PI / 2;
     cloud.rotation.z = Math.random() * Math.PI * 2;
     group.add(cloud);
+  }
+
+  // Higher mist layer
+  for (let i = 0; i < 4; i++) {
+    const cRad = 80 + Math.random() * 100;
+    const cY = 30 + Math.random() * 30;
+    const mistMat = new THREE.MeshBasicMaterial({
+      color: topColor,
+      transparent: true,
+      opacity: 0.015 + Math.random() * 0.025,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    const mist = new THREE.Mesh(new THREE.RingGeometry(cRad * 0.3, cRad * 0.7, 20), mistMat);
+    mist.position.set(0, cY, 0);
+    mist.rotation.x = -Math.PI / 2 + (Math.random() - 0.5) * 0.2;
+    mist.rotation.z = Math.random() * Math.PI * 2;
+    group.add(mist);
   }
 
   let time = 0;

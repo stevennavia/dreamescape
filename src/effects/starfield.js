@@ -11,7 +11,6 @@ export function createStarfield() {
   const twinkleSpeed = new Float32Array(count);
   const twinklePhase = new Float32Array(count);
   const colors = new Float32Array(count * 3);
-  const colorTints = [];
 
   const starColor = new THREE.Color(0xffffff);
 
@@ -34,7 +33,6 @@ export function createStarfield() {
     const warm = 0.06 + Math.random() * 0.08;
     const sat = 0.05 + Math.random() * 0.1;
     const lum = 0.85 + Math.random() * 0.15;
-    colorTints.push({ warm, sat, lum });
     starColor.setHSL(warm, sat, lum);
     colors[i3] = starColor.r;
     colors[i3 + 1] = starColor.g;
@@ -58,16 +56,7 @@ export function createStarfield() {
 
   const points = new THREE.Points(geo, mat);
 
-  let stageHue = 0.75;
-
-  function setColors(top, mid, bottom) {
-    stageHue = mid.getHSL({}).h;
-  }
-
-  const _tempCol = new THREE.Color();
-
   function update(time) {
-    // Twinkle
     const sizeAttr = geo.attributes.size;
     const sa = sizeAttr.array;
     for (let i = 0; i < count; i++) {
@@ -76,25 +65,9 @@ export function createStarfield() {
     }
     sizeAttr.needsUpdate = true;
 
-    // Color drift toward stage hue (only update every 10 frames for perf)
-    if (Math.floor(time * 10) % 10 === 0) {
-      const colAttr = geo.attributes.color;
-      const cols = colAttr.array;
-      for (let i = 0; i < count; i++) {
-        const t = colorTints[i];
-        const h = stageHue + (Math.sin(i * 0.7) * 0.04);
-        _tempCol.setHSL(h < 0 ? h + 1 : h > 1 ? h - 1 : h, t.sat * 0.5, t.lum);
-        const i3 = i * 3;
-        cols[i3] = _tempCol.r;
-        cols[i3 + 1] = _tempCol.g;
-        cols[i3 + 2] = _tempCol.b;
-      }
-      colAttr.needsUpdate = true;
-    }
-
     points.rotation.y += 0.0001;
     points.rotation.x += 0.00002;
   }
 
-  return { points, update, setColors };
+  return { points, update };
 }

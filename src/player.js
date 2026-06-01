@@ -158,11 +158,17 @@ export function createPlayer(terrainGetHeight, islandsGetCollision, islandsGetPu
     }
 
     // --- Island push (horizontal wall) ---
-    if (islandsGetPush && !isDashing) {
+    if (islandsGetPush) {
       const push = islandsGetPush(position.x, position.z, position.y - PR, PR);
       if (push) {
         position.x = push.x;
         position.z = push.z;
+        if (isDashing) {
+          isDashing = false;
+          dashTimer = 0;
+          velocity.set(0, 0, 0);
+          state = 'Walk';
+        }
         if (!isGrounded && velocity.y < 0) {
           wallNormal = { nx: push.nx, nz: push.nz };
         }
@@ -185,11 +191,17 @@ export function createPlayer(terrainGetHeight, islandsGetCollision, islandsGetPu
     }
 
     // --- Tower wall push ---
-    if (towerGetWallPush && !isDashing) {
+    if (towerGetWallPush) {
       const push = towerGetWallPush(position.x, position.z, position.y - PR, PR);
       if (push) {
         position.x = push.x;
         position.z = push.z;
+        if (isDashing) {
+          isDashing = false;
+          dashTimer = 0;
+          velocity.set(0, 0, 0);
+          state = 'Walk';
+        }
         if (!isGrounded && velocity.y < 0) {
           wallNormal = { nx: push.nx, nz: push.nz };
         }

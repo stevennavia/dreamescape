@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 
-export function createIslands(terrainGetHeight) {
+export function createIslands(terrainGetHeight, towerPos) {
   const group = new THREE.Group();
   const islands = [];
   const orbData = [];
@@ -20,17 +20,30 @@ export function createIslands(terrainGetHeight) {
   });
 
   for (let i = 0; i < CONFIG.islandCount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 15 + Math.random() * 60;
+    let angle = Math.random() * Math.PI * 2;
+    let radius = 15 + Math.random() * 60;
+
+    if (i === 0 && towerPos) {
+      const towerAngle = Math.atan2(towerPos.z, towerPos.x);
+      const towerDist = Math.sqrt(towerPos.x * towerPos.x + towerPos.z * towerPos.z);
+      const offsetAngle = (Math.PI / 4) + Math.random() * (Math.PI / 4);
+      angle = towerAngle + offsetAngle;
+      radius = towerDist * 0.55 + Math.random() * 5;
+    }
+
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     const groundH = terrainGetHeight(x, z);
-    const floatHeight = groundH + 15 + Math.random() * 25;
+    const floatHeight = i === 0 && towerPos
+      ? groundH + 40 + Math.random() * 15
+      : groundH + 15 + Math.random() * 25;
     const size = 3 + Math.random() * 5;
     const color = baseColors[Math.floor(Math.random() * baseColors.length)];
 
     // Top platform
-    const topGeo = new THREE.DodecahedronGeometry(size, 0);
+    const topGeo = i === 0
+      ? new THREE.SphereGeometry(size, 20, 12)
+      : new THREE.DodecahedronGeometry(size, 0);
     const topMat = new THREE.MeshStandardMaterial({
       color,
       roughness: 0.6,
@@ -39,7 +52,7 @@ export function createIslands(terrainGetHeight) {
     });
     const top = new THREE.Mesh(topGeo, topMat);
     top.position.set(x, floatHeight, z);
-    top.scale.y = 0.4;
+    top.scale.y = i === 0 ? 0.3 : 0.4;
     top.rotation.set(Math.random() * 0.5, Math.random() * Math.PI * 2, Math.random() * 0.3);
     top.castShadow = true;
     top.receiveShadow = true;
@@ -81,12 +94,13 @@ export function createIslands(terrainGetHeight) {
       centerX: x,
       centerZ: z,
       radius: size,
+      isFirst: i === 0 && !!towerPos,
     };
     islands.push(isl);
 
     // --- Orb on this island (first ORB_TOTAL islands get an orb) ---
     if (i < ORB_TOTAL) {
-      const orbY = floatHeight + size * 0.4 + 2.0 + Math.random() * 0.5;
+      const orbY = floatHeight + size * 0.3 + 4.0;
       const oSize = 0.6 + Math.random() * 0.2;
       const oGeo = new THREE.SphereGeometry(oSize, 12, 12);
       const oMat = orbMat.clone();
@@ -183,7 +197,7 @@ export function createIslands(terrainGetHeight) {
       const dx = x - isl.centerX;
       const dz = z - isl.centerZ;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      if (dist < isl.radius * 1.3) {
+      if (dist < isl.radius * (isl.isFirst ? 1.1 : 1.3)) {
         const topSurf = isl.baseY + isl.radius * 0.4;
         const botSurf = isl.baseY - isl.radius * 1.8;
         if (y >= botSurf && y <= topSurf + 1.5) {
@@ -200,7 +214,7 @@ export function createIslands(terrainGetHeight) {
       const dx = x - isl.centerX;
       const dz = z - isl.centerZ;
       const dist = Math.sqrt(dx * dx + dz * dz);
-      const colRadius = isl.radius * 1.3;
+      const colRadius = isl.radius * (isl.isFirst ? 1.1 : 1.3);
       if (dist >= colRadius + playerRadius || dist < 0.01) continue;
       const topSurf = isl.baseY + isl.radius * 0.4;
       const botSurf = isl.baseY - isl.radius * 1.8;

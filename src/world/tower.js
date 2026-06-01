@@ -5,21 +5,19 @@ export function createTower(terrainGetHeight) {
   const group = new THREE.Group();
   const TOWER_DIST = CONFIG.tower.distance;
 
-  // Tower world position
   const towerAngle = Math.random() * Math.PI * 2;
   const worldX = Math.cos(towerAngle) * TOWER_DIST;
   const worldZ = Math.sin(towerAngle) * TOWER_DIST;
   const groundY = terrainGetHeight(worldX, worldZ);
   group.position.set(worldX, 0, worldZ);
 
-  // Parameters
-  const SPIRE_RADIUS = 3.0;
-  const RAMP_WIDTH = 3.0;
-  const TOTAL_HEIGHT = 80;
-  const SPIRAL_TURNS = 7;
-  const SEGMENTS = 250;
+  const SPIRE_RADIUS = 5.0;
+  const RAMP_WIDTH = 3.5;
+  const TOTAL_HEIGHT = 55;
+  const SPIRAL_TURNS = 6;
+  const SEGMENTS = 200;
 
-  // --- Spire (narrow central tower) ---
+  // --- Spire ---
   const bodyMat = new THREE.MeshPhysicalMaterial({
     color: 0x3a2a6a,
     emissive: 0x2a1a4a,
@@ -34,7 +32,6 @@ export function createTower(terrainGetHeight) {
   body.position.y = groundY + TOTAL_HEIGHT / 2;
   group.add(body);
 
-  // Inner glow core
   const coreMat = new THREE.MeshBasicMaterial({
     color: 0x6644aa,
     transparent: true,
@@ -44,7 +41,7 @@ export function createTower(terrainGetHeight) {
   core.position.y = groundY + TOTAL_HEIGHT / 2;
   group.add(core);
 
-  // --- Spiral ramp (wraps outside the spire) ---
+  // --- Spiral ramp ---
   const rampMat = new THREE.MeshPhysicalMaterial({
     color: 0x7a5a9a,
     emissive: 0x5a3a7a,
@@ -68,19 +65,8 @@ export function createTower(terrainGetHeight) {
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
 
-    // Inner edge (at spire surface)
-    rampPositions.push(
-      SPIRE_RADIUS * cosA,
-      y,
-      SPIRE_RADIUS * sinA
-    );
-    // Outer edge (extends outward)
-    rampPositions.push(
-      (SPIRE_RADIUS + RAMP_WIDTH) * cosA,
-      y,
-      (SPIRE_RADIUS + RAMP_WIDTH) * sinA
-    );
-
+    rampPositions.push(SPIRE_RADIUS * cosA, y, SPIRE_RADIUS * sinA);
+    rampPositions.push((SPIRE_RADIUS + RAMP_WIDTH) * cosA, y, (SPIRE_RADIUS + RAMP_WIDTH) * sinA);
     rampUVs.push(0, t);
     rampUVs.push(1, t);
 
@@ -105,7 +91,7 @@ export function createTower(terrainGetHeight) {
   ramp.receiveShadow = true;
   group.add(ramp);
 
-  // Ramp railing (inner and outer edge wires)
+  // --- Ramp railing ---
   const railMat = new THREE.MeshBasicMaterial({
     color: 0x8866cc,
     transparent: true,
@@ -125,35 +111,19 @@ export function createTower(terrainGetHeight) {
     group.add(tube);
   }
 
-  // --- Horizontal light rings on tower ---
-  for (let i = 0; i < 10; i++) {
+  // --- Light rings ---
+  for (let i = 0; i < 5; i++) {
     const y = groundY + 8 + i * 11;
-    const ringGeo = new THREE.TorusGeometry(SPIRE_RADIUS + 0.2, 0.08, 8, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x8866cc,
       transparent: true,
       opacity: 0.15 + Math.sin(i) * 0.05,
     });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(SPIRE_RADIUS + 0.1, SPIRE_RADIUS + 0.3, 32), ringMat);
     ring.position.set(0, y, 0);
-    ring.rotation.x = Math.PI / 2;
+    ring.rotation.x = -Math.PI / 2;
     group.add(ring);
   }
-
-  // --- Crown ring at top ---
-  const crownMat = new THREE.MeshPhysicalMaterial({
-    color: 0xaa88ee,
-    emissive: 0x8866cc,
-    emissiveIntensity: 0.3,
-    transparent: true,
-    opacity: 0.5,
-    roughness: 0.3,
-    metalness: 0.2,
-  });
-  const crown = new THREE.Mesh(new THREE.TorusGeometry(SPIRE_RADIUS * 0.7, 0.15, 12, 32), crownMat);
-  crown.position.y = groundY + TOTAL_HEIGHT + 1;
-  crown.rotation.x = Math.PI / 2;
-  group.add(crown);
 
   // --- Summit platform ---
   const summitY = groundY + TOTAL_HEIGHT;
@@ -162,161 +132,146 @@ export function createTower(terrainGetHeight) {
     emissive: 0x7a5a9a,
     emissiveIntensity: 0.2,
     transparent: true,
-    opacity: 0.7,
+    opacity: 1.0,
     roughness: 0.3,
     metalness: 0.1,
     flatShading: true,
   });
-  const summitPlat = new THREE.Mesh(new THREE.CircleGeometry(SPIRE_RADIUS * 0.8, 20), summitMat);
-  summitPlat.position.set(0, summitY, 0);
+  const summitPlat = new THREE.Mesh(new THREE.CircleGeometry(SPIRE_RADIUS, 32), summitMat);
+  summitPlat.position.set(0, summitY + 0.05, 0);
   summitPlat.rotation.x = -Math.PI / 2;
   group.add(summitPlat);
 
-  // Glow ring under summit
-  const summitGlow = new THREE.Mesh(
-    new THREE.TorusGeometry(SPIRE_RADIUS * 0.8, 0.1, 8, 24),
-    new THREE.MeshBasicMaterial({ color: 0x8866cc, transparent: true, opacity: 0.2 })
-  );
-  summitGlow.position.set(0, summitY - 0.1, 0);
-  summitGlow.rotation.x = Math.PI / 2;
-  group.add(summitGlow);
-
-  // --- Summit portal ---
-  const portalRingMat = new THREE.MeshStandardMaterial({
-    color: CONFIG.portalColor,
-    emissive: CONFIG.portalGlow,
-    emissiveIntensity: 2.0,
-    roughness: 0.2,
-    metalness: 0.1,
+  // --- Orb at summit ---
+  const orbMat = new THREE.MeshPhysicalMaterial({
+    color: CONFIG.orbColor,
+    emissive: CONFIG.orbColor,
+    emissiveIntensity: 1.0,
+    roughness: 0.1,
+    metalness: 0,
     transparent: true,
     opacity: 0.9,
-    side: THREE.DoubleSide,
   });
-  const portalRing = new THREE.Mesh(new THREE.TorusGeometry(3.0, 0.25, 16, 32), portalRingMat);
-  portalRing.position.set(0, summitY + 3.5, 0);
-  portalRing.rotation.x = Math.PI / 3;
-  group.add(portalRing);
+  const orbMesh = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 12), orbMat);
+  const orbY = summitY + 1.5;
+  orbMesh.position.set(0, orbY, 0);
+  group.add(orbMesh);
 
-  const portalDiscMat = new THREE.MeshBasicMaterial({
-    color: CONFIG.portalGlow,
+  const orbGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(2.4, 8, 8),
+    new THREE.MeshBasicMaterial({ color: CONFIG.orbColor, transparent: true, opacity: 0.15 })
+  );
+  orbGlow.position.copy(orbMesh.position);
+  group.add(orbGlow);
+
+  const orbLight = new THREE.PointLight(CONFIG.orbColor, 1.5, 15);
+  orbLight.position.copy(orbMesh.position);
+  group.add(orbLight);
+
+  const shaftMat = new THREE.MeshBasicMaterial({
+    color: CONFIG.orbColor,
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.06,
     side: THREE.DoubleSide,
     depthWrite: false,
   });
-  const portalDisc = new THREE.Mesh(new THREE.RingGeometry(0.3, 2.7, 24), portalDiscMat);
-  portalDisc.position.copy(portalRing.position);
-  portalDisc.rotation.copy(portalRing.rotation);
-  group.add(portalDisc);
+  const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 1.0, 3.5, 6, 1, true), shaftMat);
+  shaft.position.set(0, orbY - 1.75, 0);
+  group.add(shaft);
 
-  const portalRing2 = new THREE.Mesh(
-    new THREE.TorusGeometry(3.6, 0.1, 8, 32),
-    new THREE.MeshBasicMaterial({ color: CONFIG.portalGlow, transparent: true, opacity: 0.35 })
-  );
-  portalRing2.position.copy(portalRing.position);
-  portalRing2.rotation.x = Math.PI / 3;
-  group.add(portalRing2);
-
-  const portalLight = new THREE.PointLight(CONFIG.portalColor, 3, 25);
-  portalLight.position.copy(portalRing.position);
-  group.add(portalLight);
-
-  // --- Floating crystals around tower ---
-  for (let i = 0; i < 16; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const r = SPIRE_RADIUS + 2 + Math.random() * 5;
-    const y = groundY + 5 + Math.random() * TOTAL_HEIGHT;
-    const size = 0.4 + Math.random() * 0.6;
-    const cryMat = new THREE.MeshPhysicalMaterial({
-      color: 0x8866cc,
-      emissive: 0x6644aa,
-      emissiveIntensity: 0.1,
-      transparent: true,
-      opacity: 0.3,
-    });
-    const cry = new THREE.Mesh(new THREE.OctahedronGeometry(size, 0), cryMat);
-    cry.position.set(Math.cos(a) * r, y, Math.sin(a) * r);
-    cry.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
-    group.add(cry);
-  }
+  let orbCollected = false;
 
   // --- Collision detection ---
   function getCollision(x, z, y) {
     const lx = x - worldX;
     const lz = z - worldZ;
-    const dist = Math.sqrt(lx * lx + lz * lz);
-    const innerR = SPIRE_RADIUS - 0.3;
-    const outerR = SPIRE_RADIUS + RAMP_WIDTH + 0.3;
+    const distSq = lx * lx + lz * lz;
 
-    if (dist < innerR || dist > outerR) {
-      // Check summit platform
-      const sx = lx, sz = lz;
-      if (sx * sx + sz * sz < SPIRE_RADIUS * 0.8 * SPIRE_RADIUS * 0.8) {
-        if (y >= summitY - 0.3 && y <= summitY + 2) {
-          return summitY;
+    // Summit platform (takes priority)
+    if (y >= summitY - 0.3 && y <= summitY + 2 && distSq < SPIRE_RADIUS * SPIRE_RADIUS) {
+      return summitY;
+    }
+
+    // Ramp collision (below summit)
+    if (y < summitY) {
+      const dist = Math.sqrt(distSq);
+      const innerR = SPIRE_RADIUS - 0.3;
+      const outerR = SPIRE_RADIUS + RAMP_WIDTH + 0.3;
+
+      if (dist >= innerR && dist <= outerR) {
+        let angle = Math.atan2(lz, lx);
+        if (angle < 0) angle += Math.PI * 2;
+
+        let bestY = null;
+        let bestDist = 10;
+        for (let k = 0; k < SPIRAL_TURNS; k++) {
+          const rampY = (angle / (Math.PI * 2) + k) / SPIRAL_TURNS * TOTAL_HEIGHT + groundY;
+          if (rampY >= summitY) continue;
+          const dy = Math.abs(rampY - y);
+          if (dy < bestDist) {
+            bestDist = dy;
+            bestY = rampY;
+          }
+        }
+
+        if (bestY !== null && y >= bestY - 0.5 && y <= bestY + 2.5) {
+          return bestY;
         }
       }
-      return null;
     }
 
-    let angle = Math.atan2(lz, lx);
-    if (angle < 0) angle += Math.PI * 2;
-
-    let bestY = null;
-    let bestDist = 10;
-    for (let k = 0; k < SPIRAL_TURNS; k++) {
-      const rampY = (angle / (Math.PI * 2) + k) / SPIRAL_TURNS * TOTAL_HEIGHT + groundY;
-      if (rampY > summitY - 1) continue;
-      const dy = Math.abs(rampY - y);
-      if (dy < bestDist) {
-        bestDist = dy;
-        bestY = rampY;
-      }
-    }
-
-    if (bestY !== null && y >= bestY - 0.5 && y <= bestY + 2.5) {
-      return bestY;
-    }
     return null;
   }
 
   // --- Update ---
   function update(time, playerPos) {
-    const t = time;
-
-    // Rotate tower body slowly
     body.rotation.y += 0.001;
     core.rotation.y += 0.0005;
 
-    // Crown rotation
-    crown.rotation.z = t * 0.05;
+    // Orb animation
+    if (!orbCollected) {
+      const bob = Math.sin(time * 0.5) * 0.3;
+      orbMesh.position.y = orbY + bob;
+      orbGlow.position.y = orbY + bob;
+      orbLight.position.y = orbY + bob;
+      shaft.position.y = orbY - 1.75 + bob;
+      orbMesh.rotation.y += 0.02;
+      const pulse = 0.6 + Math.sin(time * 2) * 0.4;
+      orbMat.emissiveIntensity = pulse;
+      orbGlow.material.opacity = 0.12 + Math.sin(time * 1.5) * 0.08;
+      orbLight.intensity = 1.0 + Math.sin(time * 1.5) * 0.5;
+      shaft.material.opacity = 0.04 + Math.sin(time * 0.8) * 0.02;
 
-    // Animate summit portal
-    const pRot = time * 0.12;
-    portalRing.rotation.z = pRot;
-    portalRing2.rotation.z = pRot;
-    portalDisc.rotation.z = pRot;
-    const pulse = 1 + Math.sin(time * 0.8) * 0.15;
-    portalRingMat.emissiveIntensity = pulse * 2;
-    portalDiscMat.opacity = 0.08 + Math.sin(time * 0.5) * 0.04;
-    portalLight.intensity = 2 + Math.sin(time * 0.7) * 0.8;
+      // Collection check
+      if (playerPos) {
+        const dx = playerPos.x - (worldX + orbMesh.position.x);
+        const dy = playerPos.y - orbMesh.position.y;
+        const dz = playerPos.z - (worldZ + orbMesh.position.z);
+        if (Math.sqrt(dx * dx + dy * dy + dz * dz) < 2.5) {
+          orbCollected = true;
+          orbMesh.visible = false;
+          orbGlow.visible = false;
+          orbLight.visible = false;
+          shaft.visible = false;
+        }
+      }
+    }
 
     // Rail glow pulse
     for (const child of group.children) {
       if (child.isMesh && child.material === railMat) {
-        child.material.opacity = 0.1 + Math.sin(t * 0.3) * 0.05;
+        child.material.opacity = 0.1 + Math.sin(time * 0.3) * 0.05;
       }
     }
   }
 
-  // --- Wall collision (prevents walking through the spire) ---
   function getWallPush(x, z, y, playerRadius) {
     const lx = x - worldX;
     const lz = z - worldZ;
     const dist = Math.sqrt(lx * lx + lz * lz);
     const minDist = SPIRE_RADIUS + 0.3;
     if (dist >= minDist + playerRadius || dist < 0.01) return null;
-    if (y > summitY + 1) return null; // above summit, no wall
+    if (y > summitY - 0.5) return null;
     const nx = lx / dist, nz = lz / dist;
     return { x: worldX + nx * (minDist + playerRadius), z: worldZ + nz * (minDist + playerRadius), nx, nz, isSpire: true };
   }
@@ -327,5 +282,7 @@ export function createTower(terrainGetHeight) {
     getCollision,
     getWallPush,
     getWorldPosition: () => new THREE.Vector3(worldX, groundY, worldZ),
+    getOrbCollected: () => orbCollected,
+    getOrbPosition: () => new THREE.Vector3(worldX, orbY, worldZ),
   };
 }

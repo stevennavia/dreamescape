@@ -59,49 +59,13 @@ export function createNebula() {
     core.rotation.copy(ring.rotation);
     group.add(core);
 
-    // Galaxy disc (spiral-like)
-    const galHue = (hue + 0.1) % 1.0;
-    const galCol = new THREE.Color().setHSL(galHue, sat * 0.8, light * 1.1);
-    const galMat = new THREE.MeshBasicMaterial({
-      color: galCol,
-      transparent: true,
-      opacity: 0.03,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    });
-    const gal = new THREE.Mesh(new THREE.RingGeometry(size * 0.1, size * 0.5, 24), galMat);
-    gal.position.set(
-      px + (Math.random() - 0.5) * 60,
-      py + (Math.random() - 0.5) * 20,
-      pz + (Math.random() - 0.5) * 60
-    );
-    gal.rotation.set(
-      Math.PI / 2 + (Math.random() - 0.5) * 0.3,
-      Math.random() * Math.PI * 2,
-      0
-    );
-    group.add(gal);
-
     nebulaData.push({
-      ring, core, gal,
+      ring, core,
       rotSpeed: { x: (Math.random() - 0.5) * 0.003, y: (Math.random() - 0.5) * 0.003, z: (Math.random() - 0.5) * 0.003 },
       pulseSpeed: 0.1 + Math.random() * 0.2,
       pulsePhase: Math.random() * Math.PI * 2,
       baseOpacity: ringMat.opacity,
-      color,
     });
-  }
-
-  function setColors(top, mid, bottom) {
-    const skyHue = mid.getHSL({}).h;
-    for (const nd of nebulaData) {
-      const h = skyHue + (Math.random() - 0.5) * 0.15;
-      const c = new THREE.Color().setHSL(h < 0 ? h + 1 : h > 1 ? h - 1 : h, 0.4, 0.4);
-      nd.ring.material.color.copy(c);
-      nd.core.material.color.copy(c);
-      nd.gal.material.color.copy(c);
-    }
   }
 
   function update(time) {
@@ -110,14 +74,12 @@ export function createNebula() {
       nd.ring.rotation.y += nd.rotSpeed.y;
       nd.ring.rotation.z += nd.rotSpeed.z;
       nd.core.rotation.copy(nd.ring.rotation);
-      nd.gal.rotation.y += nd.rotSpeed.y * 0.5;
 
       const pulse = 0.6 + 0.4 * Math.sin(time * nd.pulseSpeed + nd.pulsePhase);
       nd.ring.material.opacity = nd.baseOpacity * pulse;
       nd.core.material.opacity = nd.baseOpacity * 0.5 * pulse;
-      nd.gal.material.opacity = 0.02 * pulse;
     }
   }
 
-  return { group, update, setColors };
+  return { group, update };
 }

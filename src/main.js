@@ -10,10 +10,12 @@ import { createCrystals } from './world/crystals.js';
 import { createArches } from './world/arches.js';
 import { createParticles } from './world/particles.js';
 import { createTrail } from './effects/trail.js';
+import { createMovementParticles } from './effects/movementParticles.js';
 import { createSky } from './effects/sky.js';
 import { createTower } from './world/tower.js';
 import { createStarfield } from './effects/starfield.js';
 import { createNebula } from './effects/nebula.js';
+import { createCosmicDust } from './effects/cosmicdust.js';
 
 // --- 4 World Stages ---
 const STAGES = [
@@ -57,11 +59,22 @@ const STAGES = [
     rim: '#ffeecc', rimIntensity: 0.6,
     exp: 1.0,
   },
+  {
+    name: 'Ascend',
+    skyT: '#050a05', skyM: '#228844', skyB: '#88ffbb',
+    fog: '#116633', fogDensity: 0.003,
+    amb: '#55cc88', ambIntensity: 1.1,
+    moon: '#ccffdd', moonIntensity: 4.0,
+    fill: '#66ffaa', fillIntensity: 0.9,
+    rim: '#aaffcc', rimIntensity: 0.9,
+    exp: 1.5,
+  },
 ];
 
 let currentStage = 0;
 let stageLerp = 1;
 let prevOrbCount = 0;
+let prevTowerCollected = false;
 
 // --- Flash overlay ---
 const flashOverlay = document.createElement('div');
@@ -133,7 +146,11 @@ scene.add(rimLight);
 const terrain = createTerrain();
 scene.add(terrain.mesh);
 
-const islands = createIslands(terrain.getHeightAt);
+const tower = createTower(terrain.getHeightAt);
+scene.add(tower.group);
+
+const towerPos = tower.getWorldPosition();
+const islands = createIslands(terrain.getHeightAt, towerPos);
 scene.add(islands.group);
 
 const crystals = createCrystals(terrain.getHeightAt);
@@ -141,9 +158,6 @@ scene.add(crystals.group);
 
 const arches = createArches(terrain.getHeightAt);
 scene.add(arches.group);
-
-const tower = createTower(terrain.getHeightAt);
-scene.add(tower.group);
 
 const particles = createParticles();
 scene.add(particles.points);
@@ -157,12 +171,23 @@ scene.add(starfield.points);
 const nebula = createNebula();
 scene.add(nebula.group);
 
+const cosmicDust = createCosmicDust();
+scene.add(cosmicDust.points);
+
 // --- Trail ---
 const trail = createTrail();
 scene.add(trail.points);
 
-// --- Ground orb (positioned near center, accessible from start) ---
-const groundOrbY = terrain.getHeightAt(5, 5) + 3;
+const movementParticles = createMovementParticles();
+scene.add(movementParticles.points);
+
+// --- Ground orb (positioned between spawn and tower) ---
+const _towPos = tower.getWorldPosition();
+const _orbDir = new THREE.Vector3(_towPos.x, 0, _towPos.z).normalize();
+const _orbDist = 20;
+const _orbGX = _orbDir.x * _orbDist;
+const _orbGZ = _orbDir.z * _orbDist;
+const groundOrbY = terrain.getHeightAt(_orbGX, _orbGZ) + 3;
 const gOrbMat = new THREE.MeshPhysicalMaterial({
   color: CONFIG.orbColor,
   emissive: CONFIG.orbColor,
@@ -173,7 +198,7 @@ const gOrbMat = new THREE.MeshPhysicalMaterial({
   opacity: 0.9,
 });
 const gOrb = new THREE.Mesh(new THREE.SphereGeometry(0.6, 12, 12), gOrbMat);
-gOrb.position.set(5, groundOrbY, 5);
+gOrb.position.set(_orbGX, groundOrbY, _orbGZ);
 scene.add(gOrb);
 
 const gGlow = new THREE.Mesh(
@@ -188,6 +213,55 @@ gLight.position.copy(gOrb.position);
 scene.add(gLight);
 
 let groundOrbCollected = false;
+
+// --- Orb burst particles ---
+const BURST_COUNT = 80;
+const burstPositions = new Float32Array(BURST_COUNT * 3);
+const burstColors = new Float32Array(BURST_COUNT * 3);
+const burstData = [];
+let burstActive = false;
+
+const burstGeo = new THREE.BufferGeometry();
+burstGeo.setAttribute('position', new THREE.BufferAttribute(burstPositions, 3));
+burstGeo.setAttribute('color', new THREE.BufferAttribute(burstColors, 3));
+
+const burstMat = new THREE.PointsMaterial({
+  size: 0.35,
+  vertexColors: true,
+  transparent: true,
+  opacity: 1,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  sizeAttenuation: true,
+});
+
+const burstPoints = new THREE.Points(burstGeo, burstMat);
+burstPoints.visible = false;
+scene.add(burstPoints);
+
+const _burstCol = new THREE.Color();
+
+function triggerBurst(pos) {
+  const hue = new THREE.Color(CONFIG.orbColor).getHSL({}).h;
+  for (let i = 0; i < BURST_COUNT; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const speed = 3 + Math.random() * 6;
+    burstData[i] = {
+      px: pos.x, py: pos.y, pz: pos.z,
+      vx: Math.sin(phi) * Math.cos(theta) * speed,
+      vy: Math.sin(phi) * Math.sin(theta) * speed + Math.random() * 3,
+      vz: Math.cos(phi) * speed,
+      lifetime: 0.8 + Math.random() * 0.7,
+      age: 0,
+      hue: hue + (Math.random() - 0.5) * 0.08,
+      sat: 0.6 + Math.random() * 0.4,
+      lum: 0.5 + Math.random() * 0.4,
+    };
+  }
+  burstActive = true;
+  burstPoints.visible = true;
+}
 
 // --- Portal at center (initially hidden) ---
 const centerPortalGroup = new THREE.Group();
@@ -307,8 +381,8 @@ function applyStage(s, props) {
   rimLight.intensity = props.rimIntensity;
   renderer.toneMappingExposure = props.exp;
   sky.setColors(s.skyT, s.skyM, s.skyB);
-  starfield.setColors(s.skyT, s.skyM, s.skyB);
-  nebula.setColors(s.skyT, s.skyM, s.skyB);
+  cosmicDust.setColors(s.skyT, s.skyM, s.skyB);
+  movementParticles.setColors(s.skyT, s.skyM, s.skyB);
   particles.setColors(s.skyT, s.skyM, s.skyB);
 }
 
@@ -320,7 +394,7 @@ function animate() {
 
   // --- Orb collection (each orb advances one stage) ---
   const islandCount = islands.getOrbCount();
-  const totalCollected = islandCount + (groundOrbCollected ? 1 : 0);
+  const totalCollected = islandCount + (groundOrbCollected ? 1 : 0) + (tower.getOrbCollected() ? 1 : 0);
 
   // Check ground orb collection
   if (!groundOrbCollected && player.position) {
@@ -332,13 +406,25 @@ function animate() {
       gOrb.visible = false;
       gGlow.visible = false;
       gLight.visible = false;
+      triggerBurst(gOrb.position);
     }
+  }
+
+  // Tower orb burst
+  if (tower.getOrbCollected() && !prevTowerCollected) {
+    prevTowerCollected = true;
+    triggerBurst(tower.getOrbPosition());
+    ui.showHint("Hold Space To Glide", 2);
   }
 
   // Advance stage per orb collected
   if (totalCollected > prevOrbCount) {
     prevOrbCount = totalCollected;
-    if (currentStage < STAGES.length - 1) {
+    if (totalCollected >= 3) {
+      currentStage = 4;
+      stageLerp = 0;
+      triggerFlash();
+    } else if (currentStage < 3) {
       currentStage++;
       stageLerp = 0;
       triggerFlash();
@@ -390,10 +476,12 @@ function animate() {
   islands.update(time, player.position);
   crystals.update(time);
   arches.update(time);
+  movementParticles.update(dt, player.position, player.velocity, player.getState(), player.isGrounded);
   particles.update(time, dt);
   sky.update(dt);
   starfield.update(time);
   nebula.update(time);
+  cosmicDust.update(time, dt);
 
   // Update tower
   tower.update(time, player.position);
@@ -409,6 +497,37 @@ function animate() {
     gOrb.material.emissiveIntensity = pulse;
     gGlow.material.opacity = 0.12 + Math.sin(time * 1.5) * 0.08;
     gLight.intensity = 1.0 + Math.sin(time * 1.5) * 0.5;
+  }
+
+  // Update orb burst
+  if (burstActive) {
+    let alive = false;
+    for (let i = 0; i < BURST_COUNT; i++) {
+      const d = burstData[i];
+      if (!d || d.age >= d.lifetime) continue;
+      alive = true;
+      d.age += dt;
+      const t = d.age / d.lifetime;
+      d.px += d.vx * dt;
+      d.py += d.vy * dt;
+      d.pz += d.vz * dt;
+      d.vy -= 5 * dt;
+      const i3 = i * 3;
+      burstPositions[i3] = d.px;
+      burstPositions[i3 + 1] = d.py;
+      burstPositions[i3 + 2] = d.pz;
+      const fade = 1 - t;
+      _burstCol.setHSL(d.hue, d.sat, d.lum * fade);
+      burstColors[i3] = _burstCol.r * fade;
+      burstColors[i3 + 1] = _burstCol.g * fade;
+      burstColors[i3 + 2] = _burstCol.b * fade;
+    }
+    burstGeo.attributes.position.needsUpdate = true;
+    burstGeo.attributes.color.needsUpdate = true;
+    if (!alive) {
+      burstActive = false;
+      burstPoints.visible = false;
+    }
   }
 
   // Animate center portal
