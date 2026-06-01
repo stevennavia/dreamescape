@@ -74,9 +74,22 @@ export function createUI() {
     }, duration * 1000);
   }
 
+  // --- White fade overlay ---
+  const whiteFade = document.createElement('div');
+  whiteFade.style.cssText = `
+    position: fixed; inset: 0; background: white;
+    opacity: 0; pointer-events: none; z-index: 9999;
+  `;
+  document.body.appendChild(whiteFade);
+
+  function showWhiteFade() {
+    whiteFade.style.transition = 'opacity 2.2s ease-in-out';
+    whiteFade.style.opacity = '1';
+  }
+
   function update(count, total) {
     orbCounter.textContent = `${count} / ${total}`;
   }
 
-  return { update, showHint };
+  return { update, showHint, showWhiteFade };
 }

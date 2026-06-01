@@ -60,7 +60,12 @@ export function createPlayer(terrainGetHeight, islandsGetCollision, islandsGetPu
     state = 'Walk';
   }
 
+  let disabled = false;
+
+  function disable() { disabled = true; }
+
   function update(input, camera, dt) {
+    if (disabled) return;
     const { keys } = input;
     const yaw = input.mouseX;
     const speed = keys.has('ShiftLeft') || keys.has('ShiftRight') ? CONFIG.runSpeed : CONFIG.walkSpeed;
@@ -273,7 +278,7 @@ export function createPlayer(terrainGetHeight, islandsGetCollision, islandsGetPu
   }
 
   return {
-    group, body, update, reset,
+    group, body, update, reset, disable,
     get position() { return position; },
     get velocity() { return velocity; },
     get isGrounded() { return isGrounded; },

@@ -2,6 +2,7 @@ export function createInput(camera) {
   const keys = new Set();
   let mouseX = 0, mouseY = 0;
   let isLocked = false;
+  let disabled = false;
   const sensitivity = 0.003;
   const autoRotateSpeed = 2.0;
 
@@ -31,6 +32,7 @@ export function createInput(camera) {
   });
 
   function update(dt) {
+    if (disabled) return;
     // Camera follows WASD: compute relative offset from current yaw
     const w = keys.has('KeyW');
     const s = keys.has('KeyS');
@@ -67,6 +69,7 @@ export function createInput(camera) {
     get mouseX() { return mouseX; },
     get mouseY() { return mouseY; },
     get isLocked() { return isLocked; },
+    set disabled(v) { disabled = v; },
     update,
     reset,
   };

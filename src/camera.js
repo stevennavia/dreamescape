@@ -13,12 +13,34 @@ export function createCamera() {
   const currentLookAt = new THREE.Vector3();
 
   let currentFov = CONFIG.fovDefault;
+  let overrideActive = false;
+  let overrideTarget = null;
+  let overrideLerpSpeed = 1.5;
+
+  function setOverride(targetPos, lerpSpeed) {
+    overrideActive = true;
+    overrideTarget = targetPos.clone();
+    if (lerpSpeed !== undefined) overrideLerpSpeed = lerpSpeed;
+  }
+
+  function clearOverride() {
+    overrideActive = false;
+    overrideTarget = null;
+    overrideLerpSpeed = 1.5;
+  }
 
   function update(playerPos, input, dt, playerState) {
+    if (overrideActive && overrideTarget) {
+      currentPos.lerp(overrideTarget, Math.min(1, overrideLerpSpeed * dt));
+      currentLookAt.lerp(overrideTarget, Math.min(1, overrideLerpSpeed * 1.3 * dt));
+      camera.position.copy(currentPos);
+      camera.lookAt(currentLookAt);
+      return;
+    }
+
     const yaw = input.mouseX;
     const pitch = input.mouseY;
 
-    // Camera distance based on state
     let distance = CONFIG.camDistance;
     if (playerState === 'Glide') {
       distance = CONFIG.camDistanceGlide;
@@ -26,14 +48,12 @@ export function createCamera() {
       distance = CONFIG.camDistance - 1;
     }
 
-    // Calculate desired camera position
     const lookDir = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw)).normalize();
 
     const camOffset = new THREE.Vector3();
     camOffset.copy(lookDir).multiplyScalar(-distance);
     camOffset.y += CONFIG.camHeight - Math.sin(pitch) * distance * 0.5;
 
-    // Slight look-ahead when moving
     if (playerState === 'Run' || playerState === 'Dash') {
       camOffset.add(lookDir.clone().multiplyScalar(-CONFIG.camLookAhead));
     }
@@ -41,7 +61,6 @@ export function createCamera() {
     const desiredPos = playerPos.clone().add(camOffset);
     desiredPos.y = Math.max(desiredPos.y, playerPos.y);
 
-    // Smooth lerp
     if (currentPos.lengthSq() === 0) {
       currentPos.copy(desiredPos);
     } else {
@@ -50,7 +69,6 @@ export function createCamera() {
     }
     currentPos.y = Math.max(currentPos.y, playerPos.y - 0.5);
 
-    // Look at player with slight lead
     const lookTarget = playerPos.clone();
     if (playerState === 'Run' || playerState === 'Dash') {
       lookTarget.add(lookDir.clone().multiplyScalar(2));
@@ -64,7 +82,6 @@ export function createCamera() {
     camera.position.copy(currentPos);
     camera.lookAt(currentLookAt);
 
-    // Dynamic FOV
     let targetFov = CONFIG.fovDefault;
     if (playerState === 'Run') targetFov = CONFIG.fovRun;
     if (playerState === 'Dash') targetFov = CONFIG.fovRun + 3;
@@ -80,5 +97,15 @@ export function createCamera() {
     camera.updateProjectionMatrix();
   }
 
-  return { camera, update, resize };
+  function addShake(intensity) {
+    camera.position.x += (Math.random() - 0.5) * intensity;
+    camera.position.y += (Math.random() - 0.5) * intensity;
+  }
+
+  function setFov(fov) {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }
+
+  return { camera, update, resize, setOverride, clearOverride, addShake, setFov };
 }

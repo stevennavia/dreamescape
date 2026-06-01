@@ -67,4 +67,18 @@ export const CONFIG = {
   moonSize: 18,
   nebulaCount: 6,
   starFieldRadius: 380,
+
+  // Black Hole
+  blackHole: {
+    posY: 3,
+    coreRadius: 0.5,
+    discRadius: 18,
+    absorptionRadius: 50,
+    playerPullRadius: 50,
+    sceneChangeRadius: 2.5,
+    particleCount: 500,
+    growDuration: 8,
+    collapseDuration: 12,
+    pullStrength: 40,
+  },
 };

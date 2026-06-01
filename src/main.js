@@ -16,6 +16,7 @@ import { createTower } from './world/tower.js';
 import { createStarfield } from './effects/starfield.js';
 import { createNebula } from './effects/nebula.js';
 import { createCosmicDust } from './effects/cosmicdust.js';
+import { createBlackHole } from './effects/blackhole.js';
 
 // --- 4 World Stages ---
 const STAGES = [
@@ -263,59 +264,8 @@ function triggerBurst(pos) {
   burstPoints.visible = true;
 }
 
-// --- Portal at center (initially hidden) ---
-const centerPortalGroup = new THREE.Group();
-const cPortalY = terrain.getHeightAt(0, 0) + 4;
-
-const cpRingMat = new THREE.MeshStandardMaterial({
-  color: CONFIG.portalColor,
-  emissive: CONFIG.portalGlow,
-  emissiveIntensity: 2.0,
-  roughness: 0.2,
-  metalness: 0.1,
-  transparent: true,
-  opacity: 0.9,
-  side: THREE.DoubleSide,
-});
-const cpRing = new THREE.Mesh(new THREE.TorusGeometry(3.0, 0.25, 16, 32), cpRingMat);
-cpRing.position.set(0, cPortalY, 0);
-cpRing.rotation.x = Math.PI / 3;
-centerPortalGroup.add(cpRing);
-
-const cpDiscMat = new THREE.MeshBasicMaterial({
-  color: CONFIG.portalGlow,
-  transparent: true,
-  opacity: 0.12,
-  side: THREE.DoubleSide,
-  depthWrite: false,
-});
-const cpDisc = new THREE.Mesh(new THREE.RingGeometry(0.3, 2.7, 24), cpDiscMat);
-cpDisc.position.copy(cpRing.position);
-cpDisc.rotation.copy(cpRing.rotation);
-centerPortalGroup.add(cpDisc);
-
-const cpRing2Mat = new THREE.MeshBasicMaterial({
-  color: CONFIG.portalGlow,
-  transparent: true,
-  opacity: 0.35,
-});
-const cpRing2 = new THREE.Mesh(new THREE.TorusGeometry(3.6, 0.1, 8, 32), cpRing2Mat);
-cpRing2.position.copy(cpRing.position);
-cpRing2.rotation.x = Math.PI / 3;
-centerPortalGroup.add(cpRing2);
-
-const cpLight = new THREE.PointLight(CONFIG.portalColor, 3, 25);
-cpLight.position.copy(cpRing.position);
-centerPortalGroup.add(cpLight);
-
-centerPortalGroup.visible = false;
-scene.add(centerPortalGroup);
-
-let portalActive = false;
-let portalAdvancing = false;
-
 // --- Camera ---
-const { camera, update: updateCamera, resize: resizeCamera } = createCamera();
+const { camera, update: updateCamera, resize: resizeCamera, setOverride: setCamOverride, clearOverride: clearCamOverride, addShake: addCamShake } = createCamera();
 
 // --- Input ---
 const input = createInput(camera);
@@ -326,6 +276,24 @@ scene.add(player.group);
 
 // --- UI ---
 const ui = createUI();
+
+// --- Black Hole Portal ---
+const absorbables = [];
+crystals.group.traverse(obj => { if (obj.isMesh) absorbables.push(obj); });
+arches.group.traverse(obj => { if (obj.isMesh) absorbables.push(obj); });
+islands.group.traverse(obj => { if (obj.isMesh) absorbables.push(obj); });
+tower.group.traverse(obj => { if (obj.isMesh) absorbables.push(obj); });
+
+const blackHole = createBlackHole({
+  player,
+  cameraObj: { setOverride: setCamOverride, addShake: addCamShake },
+  input, ui,
+  terrainY: terrain.getHeightAt(0, 0),
+  absorbables,
+});
+scene.add(blackHole.group);
+
+let portalActive = false;
 
 // --- Resize ---
 window.addEventListener('resize', () => {
@@ -420,33 +388,21 @@ function animate() {
   // Advance stage per orb collected
   if (totalCollected > prevOrbCount) {
     prevOrbCount = totalCollected;
-    if (totalCollected >= 3) {
-      currentStage = 4;
-      stageLerp = 0;
-      triggerFlash();
-    } else if (currentStage < 3) {
+    if (totalCollected < 3 && currentStage < 3) {
       currentStage++;
       stageLerp = 0;
       triggerFlash();
-    }
-  }
-
-  // Activate portal when all 3 orbs collected
-  if (totalCollected >= 3 && !portalActive) {
-    portalActive = true;
-    centerPortalGroup.visible = true;
-  }
-
-  // Portal enter → bonus visual (no stage change, already happened per orb)
-  if (portalActive && !portalAdvancing && player.position) {
-    const dx = player.position.x;
-    const dy = player.position.y - cPortalY;
-    const dz = player.position.z;
-    if (Math.sqrt(dx * dx + dy * dy + dz * dz) < 4) {
-      portalAdvancing = true;
-      centerPortalGroup.visible = false;
+    } else if (totalCollected >= 3) {
       triggerFlash();
     }
+  }
+
+  // Activate black hole portal when all 3 orbs collected
+  if (totalCollected >= 3 && !portalActive) {
+    portalActive = true;
+    blackHole.start();
+    setCamOverride(blackHole.portalPosition, 0.3);
+    setTimeout(() => clearCamOverride(), 5000);
   }
 
   // Stage transition lerp
@@ -530,16 +486,16 @@ function animate() {
     }
   }
 
-  // Animate center portal
+  // Update black hole
   if (portalActive) {
-    const pRot = time * 0.12;
-    cpRing.rotation.z = pRot;
-    cpRing2.rotation.z = pRot;
-    cpDisc.rotation.z = pRot;
-    const pulse = 1 + Math.sin(time * 0.8) * 0.15;
-    cpRingMat.emissiveIntensity = pulse * 2;
-    cpDiscMat.opacity = 0.08 + Math.sin(time * 0.5) * 0.04;
-    cpLight.intensity = 2 + Math.sin(time * 0.7) * 0.8;
+    blackHole.update(dt, time);
+    blackHole.updatePlayerPull(dt);
+
+    // Ambient effects during black hole sequence
+    if (!blackHole.getIsTransitioning()) {
+      scene.fog.density = THREE.MathUtils.lerp(scene.fog.density, 0.008, dt * 0.1);
+      ambientLight.intensity = THREE.MathUtils.lerp(ambientLight.intensity, 0.6, dt * 0.1);
+    }
   }
 
   // Update trail
