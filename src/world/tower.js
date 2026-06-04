@@ -276,6 +276,10 @@ export function createTower(terrainGetHeight) {
     return { x: worldX + nx * (minDist + playerRadius), z: worldZ + nz * (minDist + playerRadius), nx, nz, isSpire: true };
   }
 
+  group.traverse(child => {
+    if (child.isMesh) child.userData.isTower = true;
+  });
+
   return {
     group,
     update,

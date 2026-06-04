@@ -22,17 +22,18 @@ export function createIslands(terrainGetHeight, towerPos) {
   for (let i = 0; i < CONFIG.islandCount; i++) {
     let angle = Math.random() * Math.PI * 2;
     let radius = 15 + Math.random() * 60;
+    let x, z;
 
     if (i === 0 && towerPos) {
       const towerAngle = Math.atan2(towerPos.z, towerPos.x);
-      const towerDist = Math.sqrt(towerPos.x * towerPos.x + towerPos.z * towerPos.z);
-      const offsetAngle = (Math.PI / 4) + Math.random() * (Math.PI / 4);
-      angle = towerAngle + offsetAngle;
-      radius = towerDist * 0.55 + Math.random() * 5;
+      const islAngle = towerAngle + (Math.PI / 8) + Math.random() * (Math.PI / 8);
+      const islDist = 75 + Math.random() * 10;
+      x = Math.cos(islAngle) * islDist;
+      z = Math.sin(islAngle) * islDist;
+    } else {
+      x = Math.cos(angle) * radius;
+      z = Math.sin(angle) * radius;
     }
-
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
     const groundH = terrainGetHeight(x, z);
     const floatHeight = i === 0 && towerPos
       ? groundH + 40 + Math.random() * 15

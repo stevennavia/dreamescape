@@ -40,6 +40,7 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
     });
     const mesh = new THREE.Mesh(new THREE.RingGeometry(innerR, outerR, 64), mat);
     mesh.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.2;
+    mesh.rotation.z = Math.random() * Math.PI * 2;
     group.add(mesh);
     discMats.push(mat);
     discMeshes.push(mesh);
@@ -110,11 +111,14 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
   group.add(disParticles);
 
   function spawnDisintegration(worldPos, count) {
+    const toCenter = new THREE.Vector3()
+      .subVectors(portalPos, worldPos)
+      .normalize();
     for (let n = 0; n < count; n++) {
       const i3 = disHead * 3;
-      disPos[i3] = worldPos.x - portalPos.x + (Math.random() - 0.5) * 3;
-      disPos[i3 + 1] = worldPos.y - portalPos.y + (Math.random() - 0.5) * 3;
-      disPos[i3 + 2] = worldPos.z - portalPos.z + (Math.random() - 0.5) * 3;
+      disPos[i3] = worldPos.x - portalPos.x + (Math.random() - 0.5) * 2;
+      disPos[i3 + 1] = worldPos.y - portalPos.y + (Math.random() - 0.5) * 2;
+      disPos[i3 + 2] = worldPos.z - portalPos.z + (Math.random() - 0.5) * 2;
 
       const hue = 0.65 + Math.random() * 0.25;
       const col = new THREE.Color().setHSL(hue, 0.7 + Math.random() * 0.3, 0.5 + Math.random() * 0.4);
@@ -122,12 +126,13 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
       disCol[i3 + 1] = col.g;
       disCol[i3 + 2] = col.b;
 
+      const speed = 0.5 + Math.random() * 1.5;
       disData[disHead] = {
         age: 0,
-        lifetime: 1.0 + Math.random() * 0.8,
-        vx: (Math.random() - 0.5) * 2,
-        vy: (Math.random() - 0.5) * 2,
-        vz: (Math.random() - 0.5) * 2,
+        lifetime: 1.5 + Math.random() * 1.2,
+        vx: toCenter.x * speed + (Math.random() - 0.5) * 1.2,
+        vy: toCenter.y * speed + (Math.random() - 0.5) * 1.2,
+        vz: toCenter.z * speed + (Math.random() - 0.5) * 1.2,
       };
       disHead = (disHead + 1) % DISCount;
     }
@@ -148,15 +153,15 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
       const t = d.age / d.lifetime;
       const i3 = i * 3;
 
-      // Move toward portal center
+      // Move toward portal center with increasing acceleration
       const cx = posArr[i3], cy = posArr[i3 + 1], cz = posArr[i3 + 2];
       const dx = -cx, dy = -cy, dz = -cz;
       const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
       if (dist > 0.1) {
-        const pull = 6 * t;
-        posArr[i3] += (dx / dist) * pull * dt + d.vx * dt;
-        posArr[i3 + 1] += (dy / dist) * pull * dt + d.vy * dt;
-        posArr[i3 + 2] += (dz / dist) * pull * dt + d.vz * dt;
+        const acceleration = (4 + d.age * 5) * t;
+        posArr[i3] += (dx / dist) * acceleration * dt + d.vx * dt;
+        posArr[i3 + 1] += (dy / dist) * acceleration * dt + d.vy * dt;
+        posArr[i3 + 2] += (dz / dist) * acceleration * dt + d.vz * dt;
       }
 
       // Fade out
@@ -189,7 +194,7 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
     phase = 1;
     phaseTimer = 0;
     group.visible = true;
-    group.scale.setScalar(0.01);
+    group.scale.setScalar(1);
     absorbedSet.clear();
 
     absorbableObjects.length = 0;
@@ -202,9 +207,8 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
     phaseTimer += dt;
     const t = phaseTimer;
 
-    // Dynamic absorption radius grows with portal
-    const growScale = group.scale.x;
-    const currentAbsorptionRadius = CFG.absorptionRadius * Math.max(0.3, growScale);
+    // Dynamic absorption radius
+    const currentAbsorptionRadius = CFG.absorptionRadius;
 
     // Force increases over time
     const timeForce = Math.min(t * 0.12, 2.5);
@@ -213,12 +217,12 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
     if (phase === 1) {
       const growT = Math.min(t / CFG.growDuration, 1);
       const ease = 1 - Math.pow(1 - growT, 3);
-      group.scale.setScalar(ease);
+      group.scale.setScalar(1 + ease * 4);
 
       innerGlowMat.opacity = 0.3 + Math.sin(time * 2) * 0.2;
 
       discMeshes.forEach((d, i) => {
-        d.rotation.z = time * (0.1 + i * 0.05);
+        d.rotation.z = time * (0.3 + i * 0.15) + (i * 1.2);
       });
 
       updateParticles(dt, time);
@@ -238,7 +242,7 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
     // --- Phase 2: Collapse ---
     if (phase === 2) {
       discMeshes.forEach((d, i) => {
-        d.rotation.z = time * (0.2 + i * 0.1);
+        d.rotation.z = time * (0.5 + i * 0.2) + (i * 1.5);
         discMats[i].opacity = 0.3 + Math.sin(time * 1.5 + i) * 0.1;
       });
 
@@ -259,12 +263,17 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
       if (cameraObj && cameraObj.addShake) {
         cameraObj.addShake(0.02 + Math.sin(time * 0.5) * 0.01);
       }
+
+      if (t >= CFG.collapseDuration) {
+        phase = 3;
+        phaseTimer = 0;
+      }
     }
 
     // --- Phase 3: Consumption ---
     if (phase === 3) {
       discMeshes.forEach((d, i) => {
-        d.rotation.z = time * (0.5 + i * 0.2);
+        d.rotation.z = time * (1.0 + i * 0.3) + (i * 2.0);
       });
       innerGlowMat.opacity = 0.8 + Math.sin(time * 5) * 0.2;
       portalLight.intensity = 8 + Math.sin(time * 3) * 3;
@@ -301,44 +310,51 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
       const worldPos = new THREE.Vector3();
       obj.getWorldPosition(worldPos);
       const dist = worldPos.distanceTo(portalPos);
+      const isTower = obj.userData?.isTower;
 
       if (dist < absRadius && dist > 0.1) {
         const dir = portalPos.clone().sub(worldPos).normalize();
         const proximity = 1 - dist / absRadius;
 
-        // Gravitational force: grows exponentially as objects approach
-        const gravityForce = Math.pow(proximity, 1.5) * 8 * mult;
-        const speed = gravityForce;
+        // Tower is absorbed much slower
+        const towerMult = isTower ? 0.25 : 1.0;
 
-        // Move toward portal
-        obj.position.add(dir.multiplyScalar(speed * dt));
+        // Gravitational force
+        const gravityForce = Math.pow(proximity, 3) * 3 * mult * towerMult;
+        obj.position.add(dir.multiplyScalar(gravityForce * dt));
 
         // Spiral rotation (stronger near center)
-        const rotMult = proximity * mult;
-        obj.rotation.x += dt * 3 * rotMult;
-        obj.rotation.y += dt * 4 * rotMult;
-        obj.rotation.z += dt * 2 * rotMult;
+        const rotMult = proximity * mult * towerMult;
+        obj.rotation.x += dt * 2 * rotMult;
+        obj.rotation.y += dt * 3 * rotMult;
+        obj.rotation.z += dt * 1.5 * rotMult;
 
-        // Scale down proportionally
-        const scale = Math.max(0.01, 1 - proximity * 0.8);
+        // Scale down: tower shrinks slower
+        const scaleMult = isTower ? 0.4 : 1.0;
+        const scale = Math.max(0.01, 1 - Math.pow(proximity, 1.5) * 0.95 * scaleMult);
         obj.scale.setScalar(scale);
 
-        // Fade opacity for transparent objects
+        // Fade opacity proportional to proximity
         if (obj.material && obj.material.transparent) {
-          obj.material.opacity = Math.max(0.05, obj.material.opacity - dt * 0.5 * mult);
+          const opacityMult = isTower ? 0.3 : 1.0;
+          obj.material.opacity = Math.max(0.02, obj.material.opacity - dt * 0.15 * mult * proximity * opacityMult);
         }
 
-        // Disintegration particles (denser near center)
-        if (proximity > 0.05) {
-          const spawnCount = Math.ceil(proximity * proximity * 15 * mult);
+        // Disintegration particles: fewer for tower
+        if (proximity > CFG.disintegrationStart) {
+          const particleMult = isTower ? 0.4 : 1.0;
+          const spawnCount = Math.ceil(Math.pow(proximity, 1.5) * 12 * mult * particleMult);
           spawnDisintegration(worldPos, spawnCount);
         }
 
-        // Consume when close enough
-        if (dist < 2) {
-          spawnDisintegration(worldPos, 60);
-          obj.visible = false;
-          absorbedSet.add(obj);
+        // Squeeze + consume when close enough
+        if (dist < CFG.consumeDistance) {
+          obj.scale.set(obj.scale.x * 0.7, obj.scale.y * 1.5, obj.scale.z * 0.7);
+          if (obj.scale.x < 0.03) {
+            spawnDisintegration(worldPos, isTower ? 120 : 100);
+            obj.visible = false;
+            absorbedSet.add(obj);
+          }
         }
       }
     }
@@ -349,11 +365,11 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
     if (phase < 1) return;
 
     const dist = player.position.distanceTo(portalPos);
-    if (dist < CFG.playerPullRadius) {
+    if (dist < CFG.absorptionRadius) {
       const dir = portalPos.clone().sub(player.position).normalize();
-      const normalized = 1 - dist / CFG.playerPullRadius;
-      const pullMult = phase === 1 ? 8 : phase === 2 ? 20 : 40;
-      const strength = normalized * normalized * pullMult;
+      const normalized = 1 - dist / CFG.absorptionRadius;
+      const pullMult = phase === 1 ? CFG.playerPullMultPhase1 : phase === 2 ? CFG.playerPullMultPhase2 : CFG.playerPullMultPhase3;
+      const strength = normalized * pullMult + Math.pow(normalized, 3) * 5;
       player.velocity.add(dir.multiplyScalar(strength * dt));
     }
     if (dist < CFG.sceneChangeRadius) {
@@ -384,7 +400,7 @@ export function createBlackHole({ player, cameraObj, input, ui, terrainY, absorb
   }
 
   function loadNextScene() {
-    console.log('Nueva escena aún por definir');
+    window.location.href = '/scene2.html';
   }
 
   function getIsTransitioning() { return _isTransitioning; }

@@ -73,9 +73,12 @@ const STAGES = [
 ];
 
 let currentStage = 0;
+let prevStage = 0;
 let stageLerp = 1;
 let prevOrbCount = 0;
 let prevTowerCollected = false;
+let blackHoleCycleTimer = 0;
+const blackHoleCycleInterval = 2;
 
 // --- Flash overlay ---
 const flashOverlay = document.createElement('div');
@@ -321,8 +324,8 @@ const _lerped = {
 };
 
 function lerpStage(t) {
-  const from = STAGES[currentStage];
-  const to = STAGES[Math.min(currentStage + 1, STAGES.length - 1)];
+  const from = STAGES[prevStage];
+  const to = STAGES[currentStage];
   for (const key of ['skyT', 'skyM', 'skyB', 'fog', 'amb', 'moon', 'fill', 'rim']) {
     _lerped[key].lerpColors(new THREE.Color(from[key]), new THREE.Color(to[key]), t);
   }
@@ -388,8 +391,14 @@ function animate() {
   // Advance stage per orb collected
   if (totalCollected > prevOrbCount) {
     prevOrbCount = totalCollected;
-    if (totalCollected < 3 && currentStage < 3) {
-      currentStage++;
+    if (totalCollected === 1) {
+      prevStage = currentStage;
+      currentStage = 2;
+      stageLerp = 0;
+      triggerFlash();
+    } else if (totalCollected === 2) {
+      prevStage = currentStage;
+      currentStage = 3;
       stageLerp = 0;
       triggerFlash();
     } else if (totalCollected >= 3) {
@@ -403,6 +412,17 @@ function animate() {
     blackHole.start();
     setCamOverride(blackHole.portalPosition, 0.3);
     setTimeout(() => clearCamOverride(), 5000);
+  }
+
+  // Sky cycling during black hole sequence
+  if (portalActive && !blackHole.getIsTransitioning() && stageLerp >= 1) {
+    blackHoleCycleTimer += dt;
+    if (blackHoleCycleTimer >= blackHoleCycleInterval) {
+      blackHoleCycleTimer = 0;
+      prevStage = currentStage;
+      currentStage = (currentStage + 1) % STAGES.length;
+      stageLerp = 0;
+    }
   }
 
   // Stage transition lerp

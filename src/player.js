@@ -248,6 +248,17 @@ export function createPlayer(terrainGetHeight, islandsGetCollision, islandsGetPu
       reset();
     }
 
+    // World boundary
+    const maxDist = CONFIG.worldSize / 2;
+    const distFromCenter = Math.sqrt(position.x * position.x + position.z * position.z);
+    if (distFromCenter > maxDist) {
+      const ratio = (maxDist - 2) / distFromCenter;
+      position.x *= ratio;
+      position.z *= ratio;
+      velocity.x *= 0.3;
+      velocity.z *= 0.3;
+    }
+
     // Update group position
     group.position.copy(position);
 
